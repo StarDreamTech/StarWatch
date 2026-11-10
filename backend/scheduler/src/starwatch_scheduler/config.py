@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from starwatch_core.constants import (
@@ -20,6 +22,7 @@ class Settings(BaseSettings):
 
     mongodb_uri: str = "mongodb://localhost:27017"
     mongodb_db: str = "starwatch"
+    repository_backend: Literal["mongo", "memory"] = "mongo"
     scheduler_host: str = "0.0.0.0"
     scheduler_port: int = 8080
     scheduler_enabled: bool = True

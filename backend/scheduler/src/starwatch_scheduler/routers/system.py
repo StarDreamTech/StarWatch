@@ -40,14 +40,16 @@ def _repo(request: Request) -> TaskRepository:
 
 @router.get("/health", response_model=Health)
 async def health(request: Request) -> Health | JSONResponse:
-    """检查调度器和数据库。"""
-    mongo_ok = await _repo(request).ping()
+    """检查调度器和数据库。内存试验不把存储报成 MongoDB。"""
+    settings = request.app.state.settings
+    storage_ok = await _repo(request).ping()
+    mongo = "skipped" if settings.repository_backend == "memory" else "ok" if storage_ok else "down"
     body = Health(
-        status="ok" if mongo_ok else "degraded",
+        status="ok" if storage_ok else "degraded",
         service="scheduler",
-        mongo="ok" if mongo_ok else "down",
+        mongo=mongo,
     )
-    if not mongo_ok:
+    if not storage_ok:
         return JSONResponse(status_code=503, content=body.model_dump())
     return body
 

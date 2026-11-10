@@ -23,6 +23,7 @@ from starwatch_scheduler.config import Settings, get_settings
 from starwatch_scheduler.fetcher_client import FetchClient, HttpxFetchClient
 from starwatch_scheduler.logging import configure_logging
 from starwatch_scheduler.loop import scheduler_loop
+from starwatch_scheduler.memory_store import MemoryRepository
 from starwatch_scheduler.mongo_store import MongoRepository
 from starwatch_scheduler.notify_service import NotifyService
 from starwatch_scheduler.repository import TaskRepository
@@ -59,11 +60,16 @@ def create_app(
 
     Args:
         settings: 显式配置。为空时读取环境变量。
-        repo: 存储实现。为空时连接 MongoDB。
+        repo: 存储实现。为空时按 REPOSITORY_BACKEND 选择 MongoDB 或内存。
         fetcher: 抓取客户端。为空时按 FETCHER_BASE_URL 创建。
     """
     settings = settings or get_settings()
-    repository = repo or MongoRepository(settings.mongodb_uri, settings.mongodb_db)
+    if repo is not None:
+        repository = repo
+    elif settings.repository_backend == "memory":
+        repository = MemoryRepository()
+    else:
+        repository = MongoRepository(settings.mongodb_uri, settings.mongodb_db)
     fetch_client = fetcher or HttpxFetchClient(
         settings.fetcher_base_url,
         settings.fetcher_timeout_seconds,
