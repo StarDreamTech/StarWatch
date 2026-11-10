@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="星哨 StarWatch：可自托管的定时监控平台" />
+    <title>星哨 StarWatch</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('starwatch.theme') === 'dark') {
+          document.documentElement.classList.add('dark')
+        }
+      } catch (error) {
+        /* 隐私模式可能拒绝本地存储，保持浅色即可。 */
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
