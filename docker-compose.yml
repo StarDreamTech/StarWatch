@@ -1,0 +1,92 @@
+# 调度器按单副本设计。领取任务是原子的，但仍只应运行一个调度器。
+services:
+  mongo:
+    image: mongo:9.0.4
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  fetcher:
+    build:
+      context: .
+      dockerfile: backend/fetcher/Dockerfile
+    restart: unless-stopped
+    environment:
+      FETCHER_HOST: 0.0.0.0
+      FETCHER_PORT: "8081"
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      LOG_LEVEL: INFO
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: backend/scheduler/Dockerfile
+    restart: unless-stopped
+    environment:
+      MONGODB_URI: mongodb://mongo:27017
+      MONGODB_DB: starwatch
+      REPOSITORY_BACKEND: mongo
+      SCHEDULER_HOST: 0.0.0.0
+      SCHEDULER_PORT: "8080"
+      FETCHER_BASE_URL: http://fetcher:8081
+      FETCHER_TIMEOUT_SECONDS: "90"
+      CORS_ORIGINS: http://localhost:5173,http://127.0.0.1:5173
+      APP_TIMEZONE: Asia/Shanghai
+      LOG_LEVEL: INFO
+      RATE_LIMIT_REQUESTS: "120"
+      RATE_LIMIT_WINDOW_SECONDS: "60"
+    ports:
+      - "8080:8080"
+    depends_on:
+      mongo:
+        condition: service_healthy
+      fetcher:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      scheduler:
+        condition: service_healthy
+
+volumes:
+  mongo-data:
