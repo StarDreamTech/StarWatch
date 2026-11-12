@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
@@ -43,7 +43,9 @@ async def health(request: Request) -> Health | JSONResponse:
     """检查调度器和数据库。内存试验不把存储报成 MongoDB。"""
     settings = request.app.state.settings
     storage_ok = await _repo(request).ping()
-    mongo = "skipped" if settings.repository_backend == "memory" else "ok" if storage_ok else "down"
+    mongo: Literal["ok", "down", "skipped"] = (
+        "skipped" if settings.repository_backend == "memory" else "ok" if storage_ok else "down"
+    )
     body = Health(
         status="ok" if storage_ok else "degraded",
         service="scheduler",

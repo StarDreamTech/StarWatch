@@ -17,7 +17,15 @@ dev = [
   "pytest>=8.4",
   "pytest-asyncio>=1.4",
   "ruff>=0.17.4",
+  "starwatch-core",
+  "starwatch-fetcher",
+  "starwatch-scheduler",
 ]
+
+[tool.uv.sources]
+starwatch-core = { workspace = true }
+starwatch-fetcher = { workspace = true }
+starwatch-scheduler = { workspace = true }
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -690,6 +690,9 @@ dev = [
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
+    { name = "starwatch-core" },
+    { name = "starwatch-fetcher" },
+    { name = "starwatch-scheduler" },
 ]
 
 [package.metadata]
@@ -700,6 +703,9 @@ dev = [
     { name = "pytest", specifier = ">=8.4" },
     { name = "pytest-asyncio", specifier = ">=1.4" },
     { name = "ruff", specifier = ">=0.17.4" },
+    { name = "starwatch-core", editable = "backend/core" },
+    { name = "starwatch-fetcher", editable = "backend/fetcher" },
+    { name = "starwatch-scheduler", editable = "backend/scheduler" },
 ]
 
 [[package]]
