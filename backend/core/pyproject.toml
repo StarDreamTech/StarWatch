@@ -1,0 +1,44 @@
+[project]
+name = "starwatch-core"
+version = "0.1.0"
+description = "星哨共享数据模型与可插拔请求、代理、提取、通知槽位"
+requires-python = ">=3.15"
+dependencies = [
+  "croniter>=7.0.0",
+  "httpx[socks]>=0.28.1",
+  "jsonpath-ng>=1.16.0",
+  "parsel>=1.12.1",
+  "pydantic>=2.14.3",
+]
+
+[project.entry-points."starwatch.requesters"]
+httpx = "starwatch_core.requesters:build_httpx"
+playwright = "starwatch_core.requesters:build_playwright"
+curl_cffi = "starwatch_core.requesters:build_curl_cffi"
+drissionpage = "starwatch_core.requesters:build_drissionpage"
+
+[project.entry-points."starwatch.proxies"]
+direct = "starwatch_core.proxies:build_direct"
+static = "starwatch_core.proxies:build_static"
+rotating = "starwatch_core.proxies:build_rotating"
+pool_api = "starwatch_core.proxies:build_pool_api"
+
+[project.entry-points."starwatch.extractors"]
+css = "starwatch_core.extractors:build_css"
+xpath = "starwatch_core.extractors:build_xpath"
+jsonpath = "starwatch_core.extractors:build_jsonpath"
+regex = "starwatch_core.extractors:build_regex"
+
+[project.entry-points."starwatch.notifiers"]
+none = "starwatch_core.notifiers:build_none"
+webhook = "starwatch_core.notifiers:build_webhook"
+email = "starwatch_core.notifiers:build_email"
+
+[project.entry-points."starwatch.task_handlers"]
+page_change = "starwatch_core.handlers:build_page_change"
+api_check = "starwatch_core.handlers:build_api_check"
+load_test = "starwatch_core.handlers:build_load_test"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

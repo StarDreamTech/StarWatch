@@ -1,0 +1,21 @@
+[project]
+name = "starwatch-fetcher"
+version = "0.1.0"
+description = "星哨抓取服务：无状态执行 HTTP 请求并返回归一化结果"
+requires-python = ">=3.15"
+dependencies = [
+  "fastapi>=0.162.3",
+  "pydantic-settings>=2.7",
+  "starwatch-core",
+  "uvicorn[standard]>=0.54.0",
+]
+
+[project.scripts]
+starwatch-fetcher = "starwatch_fetcher.main:run"
+
+[tool.uv.sources]
+starwatch-core = { workspace = true }
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

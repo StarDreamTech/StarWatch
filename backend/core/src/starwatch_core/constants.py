@@ -1,0 +1,68 @@
+"""集中存放限额、默认值和识别规则，避免魔法数字散落在业务代码里。"""
+
+from __future__ import annotations
+
+NAME_MAX_LENGTH = 80
+DESCRIPTION_MAX_LENGTH = 500
+SCHEDULE_MAX_LENGTH = 120
+EXPRESSION_MAX_LENGTH = 2_000
+FIELD_NAME_MAX_LENGTH = 100
+EXPECTED_MAX_LENGTH = 500
+HEADER_MAX_COUNT = 40
+QUERY_MAX_COUNT = 40
+COOKIE_MAX_COUNT = 40
+EXTRACT_RULE_MAX_COUNT = 30
+ASSERTION_MAX_COUNT = 20
+MAX_EXTRACT_MATCHES = 50
+MAX_BODY_STORE_CHARS = 200_000
+CAPTCHA_SCAN_CHARS = 20_000
+BODY_PREVIEW_CHARS = 4_000
+DEFAULT_TIMEOUT_SECONDS = 30.0
+MIN_TIMEOUT_SECONDS = 0.1
+MAX_TIMEOUT_SECONDS = 120.0
+MIN_INTERVAL_SECONDS = 5
+MAX_INTERVAL_SECONDS = 366 * 24 * 60 * 60
+CRON_FIELD_COUNT = 5
+MAX_SCHEDULE_CATCHUP = 10_000
+DEFAULT_PAGE_LIMIT = 20
+MAX_PAGE_LIMIT = 100
+MAX_LOAD_CONCURRENCY = 50
+DEFAULT_LOAD_CONCURRENCY = 2
+MAX_LOAD_QPS = 100.0
+MAX_LOAD_DURATION_SECONDS = 60.0
+MAX_LOAD_REQUESTS = 200
+DEFAULT_LOAD_REQUESTS = 10
+LOAD_SAMPLE_LIMIT = 5
+WEBHOOK_TIMEOUT_SECONDS = 10.0
+DEFAULT_USER_AGENT = "StarWatch/0.1"
+RATE_LIMIT_DEFAULT_REQUESTS = 120
+RATE_LIMIT_DEFAULT_WINDOW_SECONDS = 60
+PERCENTILE_P50 = 50
+PERCENTILE_P95 = 95
+STALE_LOCK_SECONDS = 300
+HTTP_FORBIDDEN = 403
+HTTP_RATE_LIMITED = 429
+HTTP_CLIENT_ERROR_MIN = 400
+HTTP_NO_CONTENT = 204
+HTTP_RESET_CONTENT = 205
+EMPTY_SUCCESS_STATUSES = frozenset({HTTP_NO_CONTENT, HTTP_RESET_CONTENT})
+REDACTED_HEADER_NAMES = frozenset({"authorization", "cookie", "set-cookie", "proxy-authorization"})
+PROXY_SCHEMES = frozenset({"http", "https", "socks5", "socks5h"})
+CAPTCHA_MARKERS = (
+    "g-recaptcha",
+    "h-captcha",
+    "hcaptcha",
+    "cf-challenge",
+    "cf-turnstile",
+    "/cdn-cgi/challenge-platform",
+    "attention required",
+    "just a moment",
+    "captcha",
+)
+PROBLEM_OUTCOME_VALUES = frozenset({"failure", "blocked", "empty", "timeout"})
+SECOND_UNITS = frozenset({"s", "sec", "secs", "second", "seconds"})
+MINUTE_UNITS = frozenset({"m", "min", "mins", "minute", "minutes"})
+HOUR_UNITS = frozenset({"h", "hr", "hrs", "hour", "hours"})
+CHINESE_UNIT_SECONDS = {"秒": 1, "分钟": 60, "分": 60, "小时": 3600, "时": 3600}
+SECONDS_PER_MINUTE = 60
+SECONDS_PER_HOUR = 3600
