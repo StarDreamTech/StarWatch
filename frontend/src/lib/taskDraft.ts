@@ -11,6 +11,7 @@ import type {
   Task,
   TaskCreate,
   TaskType,
+  TargetType,
 } from '@/types/api'
 
 export interface Pair {
@@ -38,6 +39,8 @@ export interface TaskDraft {
   description: string
   enabled: boolean
   schedule: string
+  targetType: TargetType
+  compareEnabled: boolean
   method: HttpMethod
   url: string
   timeoutSeconds: string
@@ -62,6 +65,7 @@ export interface TaskDraft {
   durationSeconds: string
   requestCount: string
   notifyProvider: string
+  notifyEnabled: boolean
   webhookUrl: string
   notifyOn: Record<NotifyCategory, boolean>
 }
@@ -97,6 +101,8 @@ export function emptyDraft(taskType: TaskType): TaskDraft {
     description: '',
     enabled: true,
     schedule: taskType === 'load_test' ? '0 * * * *' : 'every 5 minutes',
+    targetType: taskType === 'page_change' ? 'html' : 'auto',
+    compareEnabled: true,
     method: 'GET',
     url: 'https://',
     timeoutSeconds: '30',
@@ -114,16 +120,14 @@ export function emptyDraft(taskType: TaskType): TaskDraft {
     proxyUrl: '',
     proxyUrls: '',
     proxyEndpoint: '',
-    rules:
-      taskType === 'page_change'
-        ? [{ name: '标题', kind: 'css', expression: 'title', attribute: '' }]
-        : [],
+    rules: taskType === 'page_change' ? [defaultRule('html')] : [],
     assertions: taskType === 'api_check' ? [{ kind: 'status', expected: '200', path: '' }] : [],
     concurrency: '2',
     qps: '',
     durationSeconds: '',
     requestCount: '10',
     notifyProvider: 'none',
+    notifyEnabled: true,
     webhookUrl: '',
     notifyOn: { change: true, failure: true, block: true },
   }
@@ -151,6 +155,8 @@ export function draftFromTask(task: Task): TaskDraft {
     description: task.description,
     enabled: task.enabled,
     schedule: task.schedule.expression,
+    targetType: task.target_type ?? 'auto',
+    compareEnabled: task.compare_enabled ?? true,
     method: request.method,
     url: request.url,
     timeoutSeconds: String(request.timeout_seconds),
@@ -190,6 +196,7 @@ export function draftFromTask(task: Task): TaskDraft {
         ? ''
         : String(task.load.request_count),
     notifyProvider: task.notify.provider,
+    notifyEnabled: task.notify.enabled ?? task.notify.on.length > 0,
     webhookUrl: textParam(task.notify.params, 'url'),
     notifyOn,
   }
@@ -285,7 +292,7 @@ export function payloadFromDraft(taskType: TaskType, draft: TaskDraft): DraftRes
   const proxy = proxyConfig(draft)
   if ('message' in proxy) return { ok: false, message: proxy.message }
 
-  const rules = collectRules(taskType, draft.rules)
+  const rules = collectRules(taskType, draft.rules, draft.targetType)
   if ('message' in rules) return { ok: false, message: rules.message }
   const assertions = collectAssertions(draft.assertions)
   if ('message' in assertions) return { ok: false, message: assertions.message }
@@ -295,7 +302,7 @@ export function payloadFromDraft(taskType: TaskType, draft: TaskDraft): DraftRes
   const notifyOn = (Object.keys(draft.notifyOn) as NotifyCategory[]).filter(
     (key) => draft.notifyOn[key],
   )
-  if (draft.notifyProvider === 'webhook' && !draft.webhookUrl.trim()) {
+  if (draft.notifyEnabled && draft.notifyProvider === 'webhook' && !draft.webhookUrl.trim()) {
     return { ok: false, message: 'Webhook 需要填写接收地址' }
   }
 
@@ -307,6 +314,8 @@ export function payloadFromDraft(taskType: TaskType, draft: TaskDraft): DraftRes
       enabled: draft.enabled,
       schedule,
       task_type: taskType,
+      target_type: draft.targetType,
+      compare_enabled: draft.compareEnabled,
       request,
       requester: { name: draft.requester, params: {} },
       proxy: proxy.config,
@@ -314,6 +323,7 @@ export function payloadFromDraft(taskType: TaskType, draft: TaskDraft): DraftRes
       assertions: assertions.assertions,
       load: load && 'spec' in load ? load.spec : null,
       notify: {
+        enabled: draft.notifyEnabled,
         provider: draft.notifyProvider,
         params: draft.notifyProvider === 'webhook' ? { url: draft.webhookUrl.trim() } : {},
         on: notifyOn,
@@ -349,6 +359,7 @@ function proxyConfig(draft: TaskDraft): { config: ProxyConfig } | { message: str
 function collectRules(
   taskType: TaskType,
   drafts: RuleDraft[],
+  targetType: TargetType,
 ): { rules: ExtractRule[] } | { message: string } {
   if (taskType !== 'page_change') return { rules: [] }
   const rules: ExtractRule[] = []
@@ -359,6 +370,12 @@ function collectRules(
     if (!name && !expression) continue
     if (!name || !expression) return { message: '提取规则的名称和表达式都要填写' }
     if (names.has(name)) return { message: `提取字段「${name}」重复了` }
+    if (!extractorAllowed(targetType, draft.kind)) {
+      return { message: `字段「${name}」的提取方式与检测对象不匹配，请修改提取方式` }
+    }
+    if (draft.kind === 'markdown' && (draft.attribute.trim() || expression.includes('::'))) {
+      return { message: 'Markdown 提取需要 CSS 元素选择器，属性请留空' }
+    }
     names.add(name)
     rules.push({
       name,
@@ -367,8 +384,25 @@ function collectRules(
       attribute: draft.attribute.trim() || null,
     })
   }
-  if (rules.length === 0) return { message: '网页监控至少需要一条提取规则' }
+  if (rules.length === 0) return { message: '内容监控至少需要一条提取规则' }
   return { rules }
+}
+
+export function extractorAllowed(targetType: TargetType, kind: ExtractorKind): boolean {
+  if (targetType === 'auto') return true
+  if (targetType === 'html') return kind !== 'jsonpath'
+  if (targetType === 'json') return kind === 'jsonpath' || kind === 'regex'
+  return kind === 'regex'
+}
+
+export function defaultRule(targetType: TargetType): RuleDraft {
+  if (targetType === 'json') {
+    return { name: 'JSON 内容', kind: 'jsonpath', expression: '$', attribute: '' }
+  }
+  if (targetType === 'text') {
+    return { name: '正文', kind: 'regex', expression: '[\\s\\S]+', attribute: '' }
+  }
+  return { name: '页面内容', kind: 'markdown', expression: 'body', attribute: '' }
 }
 
 function collectAssertions(

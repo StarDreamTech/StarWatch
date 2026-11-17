@@ -7,7 +7,9 @@ import pytest
 from starwatch_core.errors import ExtractError, PluginNotImplementedError, ProxyConfigError
 from starwatch_core.extractors import (
     css_extractor,
+    html_with_absolute_links,
     jsonpath_extractor,
+    markdown_extractor,
     regex_extractor,
     xpath_extractor,
 )
@@ -42,6 +44,26 @@ def test_invalid_regex_is_rejected() -> None:
     """坏掉的正则在保存前就会失败。"""
     with pytest.raises(ExtractError):
         regex_extractor.validate(ExtractRule(name="bad", kind="regex", expression="("))
+
+
+def test_markdown_keeps_structure_images_and_absolute_links() -> None:
+    html = """<html><head><base href="/docs/"></head><body><nav>忽略导航</nav>
+    <article><h1>更新</h1><p><strong>重点</strong> <a href="../guide">指南</a></p>
+    <ul><li>第一项</li></ul><img data-src="images/new.png" alt="新图">
+    <script>alert('不要保留')</script></article></body></html>"""
+    source = html_with_absolute_links(html, "https://example.com/redirected/page")
+    rule = ExtractRule(name="正文", kind="markdown", expression="article")
+    markdown_extractor.validate(rule)
+    result = markdown_extractor.extract(source, rule)[0]
+    assert "# 更新" in result
+    assert "**重点**" in result
+    assert "[指南](https://example.com/guide)" in result
+    assert "![新图](https://example.com/docs/images/new.png)" in result
+    assert "第一项" in result
+    assert "忽略导航" not in result
+    assert "不要保留" not in result
+    with pytest.raises(ExtractError):
+        markdown_extractor.validate(rule.model_copy(update={"attribute": "src"}))
 
 
 @pytest.mark.asyncio

@@ -8,6 +8,7 @@ from importlib.metadata import entry_points
 from starwatch_core.extractors import (
     css_extractor,
     jsonpath_extractor,
+    markdown_extractor,
     regex_extractor,
     xpath_extractor,
 )
@@ -62,7 +63,13 @@ def register_builtins() -> None:
         requesters.register(requester)
     for proxy in (direct_proxy, static_proxy, rotating_proxy, pool_api_proxy):
         proxies.register(proxy)
-    for extractor in (css_extractor, xpath_extractor, jsonpath_extractor, regex_extractor):
+    for extractor in (
+        css_extractor,
+        xpath_extractor,
+        jsonpath_extractor,
+        regex_extractor,
+        markdown_extractor,
+    ):
         extractors.register(extractor)
     for notifier in (none_notifier, webhook_notifier, email_notifier):
         notifiers.register(notifier)

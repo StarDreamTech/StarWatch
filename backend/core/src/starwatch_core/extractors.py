@@ -1,4 +1,4 @@
-"""CSS、XPath、JSONPath 和正则提取器。"""
+"""CSS、XPath、JSONPath、正则与 HTML 转 Markdown 提取器。"""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import re
 from typing import Any
 
 from jsonpath_ng.ext import parse as parse_jsonpath
+from markdownify import markdownify
 from parsel import Selector
 
 from starwatch_core.constants import MAX_EXTRACT_MATCHES
@@ -132,6 +133,45 @@ class RegexExtractor:
         return normalize_lines(values)
 
 
+class MarkdownExtractor:
+    """把 CSS 选择的 HTML 区域转换成保留图片和链接的 Markdown。"""
+
+    name = "markdown"
+    description = "CSS 选择 HTML 区域并转为 Markdown，保留标题、列表、图片和链接。"
+    implemented = True
+
+    def validate(self, rule: ExtractRule) -> None:
+        """Markdown 选择器必须选择元素，不能提取文本或属性。"""
+        if rule.attribute or "::" in rule.expression:
+            raise ExtractError("Markdown 提取需要 CSS 元素选择器，不能指定属性或伪元素")
+        css_extractor.validate(rule)
+
+    def extract(self, body: str, rule: ExtractRule) -> list[str]:
+        """转换选中区域，保持 Markdown 的段落和代码换行。"""
+        values = [
+            markdownify(
+                node.get(),
+                heading_style="ATX",
+                autolinks=False,
+                keep_inline_images_in=["a", "td", "th", "h1", "h2", "h3", "h4", "h5", "h6"],
+            )
+            for node in Selector(text=body).css(rule.expression)[:MAX_EXTRACT_MATCHES]
+        ]
+        return normalize_lines(values)
+
+
+def html_with_absolute_links(body: str, base_url: str) -> str:
+    """以最终响应地址及 HTML base 为基准，补全链接和懒加载图片地址。"""
+    selector = Selector(text=body)
+    for image in selector.css("img"):
+        if not image.attrib.get("src"):
+            source = image.attrib.get("data-src") or image.attrib.get("data-original")
+            if source:
+                image.root.set("src", source)
+    selector.root.make_links_absolute(base_url, resolve_base_href=True)
+    return str(selector.get())
+
+
 def _stringify(value: Any) -> str:
     """把 JSON 值转成稳定的比较文本。"""
     if isinstance(value, str):
@@ -143,6 +183,7 @@ css_extractor = CssExtractor()
 xpath_extractor = XPathExtractor()
 jsonpath_extractor = JsonPathExtractor()
 regex_extractor = RegexExtractor()
+markdown_extractor = MarkdownExtractor()
 
 
 def build_css() -> CssExtractor:
@@ -163,3 +204,8 @@ def build_jsonpath() -> JsonPathExtractor:
 def build_regex() -> RegexExtractor:
     """入口点工厂：正则提取器。"""
     return regex_extractor
+
+
+def build_markdown() -> MarkdownExtractor:
+    """入口点工厂：HTML 转 Markdown 提取器。"""
+    return markdown_extractor

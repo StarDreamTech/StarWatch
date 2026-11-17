@@ -7,6 +7,7 @@ dependencies = [
   "croniter>=7.0.0",
   "httpx[socks]>=0.28.1",
   "jsonpath-ng>=1.16.0",
+  "markdownify>=1.2.0",
   "parsel>=1.12.1",
   "pydantic>=2.14.3",
 ]
@@ -28,6 +29,7 @@ css = "starwatch_core.extractors:build_css"
 xpath = "starwatch_core.extractors:build_xpath"
 jsonpath = "starwatch_core.extractors:build_jsonpath"
 regex = "starwatch_core.extractors:build_regex"
+markdown = "starwatch_core.extractors:build_markdown"
 
 [project.entry-points."starwatch.notifiers"]
 none = "starwatch_core.notifiers:build_none"

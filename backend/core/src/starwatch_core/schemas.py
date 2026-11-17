@@ -34,7 +34,8 @@ from starwatch_core.constants import (
 NotifyCategory = Literal["change", "failure", "block"]
 DeliveryStatus = Literal["sent", "skipped", "failed", "not_implemented"]
 DiffStatus = Literal["added", "removed", "modified", "unchanged"]
-ExtractorKind = Literal["css", "xpath", "jsonpath", "regex"]
+ExtractorKind = Literal["css", "xpath", "jsonpath", "regex", "markdown"]
+TargetType = Literal["auto", "html", "json", "text"]
 AssertionKind = Literal["status", "latency_ms", "body_contains", "jsonpath", "header"]
 
 
@@ -211,6 +212,7 @@ def _default_notify_on() -> list[NotifyCategory]:
 class NotifySpec(_StrictModel):
     """外部通知槽位。应用内通知记录与此无关，仍会写入。"""
 
+    enabled: bool = True
     provider: str = Field(default="none", min_length=1, max_length=FIELD_NAME_MAX_LENGTH)
     params: dict[str, Any] = Field(default_factory=dict)
     on: list[NotifyCategory] = Field(default_factory=_default_notify_on)
@@ -224,6 +226,8 @@ class TaskCreate(_StrictModel):
     enabled: bool = True
     schedule: str = Field(min_length=1, max_length=SCHEDULE_MAX_LENGTH)
     task_type: TaskType
+    target_type: TargetType = "auto"
+    compare_enabled: bool = True
     request: RequestSpec
     requester: RequesterConfig = Field(default_factory=RequesterConfig)
     proxy: ProxyConfig = Field(default_factory=ProxyConfig)
@@ -250,6 +254,8 @@ class Task(_StrictModel):
     enabled: bool
     schedule: Schedule
     task_type: TaskType
+    target_type: TargetType = "auto"
+    compare_enabled: bool = True
     request: RequestSpec
     requester: RequesterConfig
     proxy: ProxyConfig
@@ -266,6 +272,16 @@ class Task(_StrictModel):
     updated_at: datetime
 
 
+class DiffLine(_StrictModel):
+    """一对对齐后的文本行，行号从 1 开始。"""
+
+    status: DiffStatus
+    before: str | None = None
+    after: str | None = None
+    before_number: int | None = None
+    after_number: int | None = None
+
+
 class FieldDiff(_StrictModel):
     """单个提取字段的前后差异。"""
 
@@ -273,6 +289,7 @@ class FieldDiff(_StrictModel):
     status: DiffStatus
     before: list[str]
     after: list[str]
+    lines: list[DiffLine] = Field(default_factory=list)
 
 
 class DiffResult(_StrictModel):
@@ -314,6 +331,7 @@ class FetchRequest(_StrictModel):
     extract_rules: list[ExtractRule] = Field(default_factory=list)
     load: LoadSpec | None = None
     task_type: TaskType
+    target_type: TargetType = "auto"
 
 
 class FetchEnvelope(_StrictModel):

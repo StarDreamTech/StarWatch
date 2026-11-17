@@ -930,24 +930,19 @@ button {
   cursor: pointer;
   color: var(--sw-muted);
 }
-.diff-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+.workflow-nav {
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
-.diff-box {
-  min-height: 48px;
-  padding: 8px;
+.workflow-nav a {
+  padding: 8px 14px;
+  border: 1px solid var(--sw-border);
   border-radius: 8px;
-  background: color-mix(in srgb, var(--sw-muted) 8%, transparent);
-  white-space: pre-wrap;
-  word-break: break-word;
+  background: var(--sw-panel);
 }
-.diff-box.before {
-  background: color-mix(in srgb, var(--sw-rose) 10%, transparent);
-}
-.diff-box.after {
-  background: color-mix(in srgb, var(--sw-cyan) 12%, transparent);
+.workflow-step {
+  scroll-margin-top: 80px;
 }
 .pre {
   max-height: 360px;
@@ -997,8 +992,7 @@ button {
   }
   .stat-grid,
   .grid-2,
-  .meta,
-  .diff-grid {
+  .meta {
     grid-template-columns: 1fr;
   }
   .page-head {

@@ -105,6 +105,17 @@ def test_empty_extract_is_empty_not_unchanged() -> None:
     assert evaluation.outcome is Outcome.EMPTY
 
 
+def test_comparison_can_be_disabled_while_retaining_snapshot() -> None:
+    task = _task().model_copy(update={"compare_enabled": False})
+    evaluation = page_change_handler.evaluate(
+        task, _envelope(extracted={"title": ["新"]}, body="新"), {"title": ["旧"]}
+    )
+    assert evaluation.outcome is Outcome.SUCCESS
+    assert evaluation.snapshot == {"title": ["新"]}
+    assert evaluation.diff is None
+    assert evaluation.notify is False
+
+
 def test_api_assertion_failure_and_expected_status() -> None:
     """断言失败可见；明确期待的 404 可以通过。"""
     task = _task(TaskType.API_CHECK)

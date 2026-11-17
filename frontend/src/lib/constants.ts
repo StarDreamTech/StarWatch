@@ -7,7 +7,7 @@ export const SEARCH_LIMIT = 8
 export const BELL_LIMIT = 8
 
 export const TASK_TYPE_LABEL = {
-  page_change: '网页监控',
+  page_change: '内容监控',
   api_check: '接口探活',
   load_test: '压力测试',
 } as const
@@ -63,7 +63,14 @@ export const SLOT_LABEL: Record<string, string> = {
 }
 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const
-export const EXTRACTOR_KINDS = ['css', 'xpath', 'jsonpath', 'regex'] as const
+export const EXTRACTOR_KINDS = ['css', 'xpath', 'jsonpath', 'regex', 'markdown'] as const
+export const EXTRACTOR_LABEL = {
+  css: 'CSS 文本 / 属性',
+  xpath: 'XPath 文本 / 属性',
+  jsonpath: 'JSONPath 字段',
+  regex: '正则表达式',
+  markdown: 'HTML → Markdown',
+} as const
 export const ASSERTION_KINDS = [
   'status',
   'latency_ms',

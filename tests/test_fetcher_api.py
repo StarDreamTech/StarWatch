@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import httpx
+import pytest
 from fastapi.testclient import TestClient
 
 from starwatch_core.classify import RawExchange
+from starwatch_core.requesters import httpx_requester
 from starwatch_core.schemas import Outcome
 from starwatch_fetcher.config import Settings
 from starwatch_fetcher.main import create_app
@@ -83,3 +86,30 @@ def test_rate_limit() -> None:
         blocked = client.get("/plugins")
         assert blocked.status_code == 429
         assert blocked.json()["code"] == "rate_limited"
+
+
+def test_fetch_extracts_markdown_and_validates_json_target(monkeypatch: pytest.MonkeyPatch) -> None:
+    """经过真实抓取服务保留图片地址，并拒绝对象类型错误的成功响应。"""
+    body = '<body><article><h1>标题</h1><img src="/image.png" alt="图片"></article></body>'
+    monkeypatch.setattr(
+        httpx_requester,
+        "_transport",
+        httpx.MockTransport(lambda request: httpx.Response(200, text=body)),
+    )
+    app = create_app(Settings(rate_limit_requests=1000))
+    with TestClient(app) as client:
+        payload = {
+            "task_type": "page_change",
+            "target_type": "html",
+            "request": {"url": "https://example.com/pages/news"},
+            "extract_rules": [{"name": "content", "kind": "markdown", "expression": "article"}],
+        }
+        result = client.post("/fetch", json=payload)
+        assert result.status_code == 200
+        assert result.json()["outcome"] == "success"
+        assert "![图片](https://example.com/image.png)" in result.json()["extracted"]["content"][0]
+        invalid = client.post("/fetch", json={**_payload(), "target_type": "json"})
+        assert invalid.json()["outcome"] == "failure"
+        assert invalid.json()["error_type"] == "extract"
+        # 旧任务没有 target_type 时仍走原来的响应解释。
+        assert client.post("/fetch", json=_payload()).json()["outcome"] == "success"

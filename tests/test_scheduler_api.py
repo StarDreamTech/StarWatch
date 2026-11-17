@@ -141,3 +141,95 @@ def test_disable_delete_and_cors() -> None:
         assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
         denied = client.get("/api/stats", headers={"Origin": "https://evil.example"})
         assert "access-control-allow-origin" not in denied.headers
+
+
+def test_compare_arbitrary_versions_and_reject_other_tasks_or_failures() -> None:
+    fetcher = FakeFetcher()
+    fetcher.envelopes = [
+        _envelope(Outcome.SUCCESS, {"content": ["第一版\n保留"]}),
+        _envelope(Outcome.SUCCESS, {"content": ["第二版\n保留"]}),
+        _envelope(Outcome.SUCCESS, {"content": ["第三版\n新增\n保留"]}),
+        _envelope(Outcome.BLOCKED),
+        _envelope(Outcome.SUCCESS, {"content": ["其他任务"]}),
+    ]
+    app = create_app(_settings(), repo=MemoryRepository(), fetcher=fetcher)
+    with TestClient(app) as client:
+        task = client.post(
+            "/api/tasks",
+            json={
+                **_page_task(),
+                "extract_rules": [{"name": "content", "kind": "css", "expression": "article"}],
+            },
+        ).json()
+        task_id = task["id"]
+        runs = [client.post(f"/api/tasks/{task_id}/run").json() for _ in range(4)]
+        compared = client.get(
+            f"/api/runs/{runs[2]['id']}/compare", params={"before_id": runs[0]["id"]}
+        )
+        assert compared.status_code == 200
+        field = compared.json()["fields"][0]
+        assert field["before"] == ["第一版\n保留"]
+        assert [line["status"] for line in field["lines"]] == ["modified", "added", "unchanged"]
+        other = client.post("/api/tasks", json=_page_task()).json()
+        other_run = client.post(f"/api/tasks/{other['id']}/run").json()
+        assert (
+            client.get(
+                f"/api/runs/{runs[2]['id']}/compare", params={"before_id": other_run["id"]}
+            ).status_code
+            == 422
+        )
+        assert (
+            client.get(
+                f"/api/runs/{runs[2]['id']}/compare", params={"before_id": runs[3]["id"]}
+            ).status_code
+            == 422
+        )
+        assert (
+            client.get(
+                f"/api/runs/{runs[2]['id']}/compare", params={"before_id": "missing"}
+            ).status_code
+            == 404
+        )
+
+
+def test_target_type_and_optional_comparison_are_saved_and_validated() -> None:
+    app = create_app(_settings(), repo=MemoryRepository(), fetcher=FakeFetcher())
+    with TestClient(app) as client:
+        body = {
+            **_page_task(),
+            "target_type": "json",
+            "compare_enabled": False,
+            "extract_rules": [{"name": "data", "kind": "jsonpath", "expression": "$"}],
+        }
+        created = client.post("/api/tasks", json=body)
+        assert created.status_code == 201
+        task = created.json()
+        assert task["target_type"] == "json"
+        assert task["compare_enabled"] is False
+        updated = client.put(f"/api/tasks/{task['id']}", json={**body, "compare_enabled": True})
+        assert updated.json()["compare_enabled"] is True
+        invalid = client.post("/api/tasks", json={**_page_task(), "target_type": "json"})
+        assert invalid.status_code == 422
+
+
+def test_disabled_notification_retains_configuration_and_suppresses_delivery() -> None:
+    fetcher = FakeFetcher()
+    fetcher.envelopes = [
+        _envelope(Outcome.SUCCESS, {"title": ["旧"]}),
+        _envelope(Outcome.SUCCESS, {"title": ["新"]}),
+    ]
+    app = create_app(_settings(), repo=MemoryRepository(), fetcher=fetcher)
+    with TestClient(app) as client:
+        task = client.post(
+            "/api/tasks",
+            json={
+                **_page_task(),
+                "notify": {"enabled": False, "provider": "none", "on": ["change"]},
+            },
+        ).json()
+        assert task["notify"]["enabled"] is False
+        assert task["notify"]["on"] == ["change"]
+        client.post(f"/api/tasks/{task['id']}/run")
+        changed = client.post(f"/api/tasks/{task['id']}/run")
+        assert changed.json()["outcome"] == "changed"
+        assert client.get("/api/notifications").json()["total"] == 0

@@ -129,6 +129,7 @@ def _fetch_request(task: Task) -> FetchRequest:
         extract_rules=rules,
         load=load,
         task_type=task.task_type,
+        target_type=task.target_type,
     )
 
 

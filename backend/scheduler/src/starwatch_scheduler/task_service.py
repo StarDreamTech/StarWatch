@@ -53,6 +53,8 @@ class TaskService:
                 "enabled": body.enabled,
                 "schedule": schedule,
                 "task_type": body.task_type,
+                "target_type": body.target_type,
+                "compare_enabled": body.compare_enabled,
                 "request": body.request,
                 "requester": body.requester,
                 "proxy": body.proxy,
@@ -114,6 +116,17 @@ def _validated_schedule(body: TaskCreate) -> Schedule:
     task_handlers.get(body.task_type.value)
     names: list[str] = []
     for rule in body.extract_rules:
+        allowed = {
+            "html": {"css", "xpath", "regex", "markdown"},
+            "json": {"jsonpath", "regex"},
+            "text": {"regex"},
+        }.get(body.target_type)
+        if allowed is not None and rule.kind not in allowed:
+            raise StarWatchError(
+                "invalid_task",
+                f"{body.target_type} 检测对象不支持 {rule.kind} 提取",
+                status_code=422,
+            )
         if rule.name in names:
             raise StarWatchError("invalid_task", f"提取字段重名：{rule.name}", status_code=422)
         names.append(rule.name)
@@ -136,6 +149,8 @@ def _new_task(body: TaskCreate, schedule: Schedule, now: datetime, task_id: str)
         enabled=body.enabled,
         schedule=schedule,
         task_type=body.task_type,
+        target_type=body.target_type,
+        compare_enabled=body.compare_enabled,
         request=body.request,
         requester=body.requester,
         proxy=body.proxy,

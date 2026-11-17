@@ -5,9 +5,22 @@ import { useRoute, useRouter } from 'vue-router'
 import ModulePageShell from '@/components/common/ModulePageShell.vue'
 import PairEditor from '@/components/common/PairEditor.vue'
 import { ApiError, api } from '@/lib/client'
-import { ASSERTION_KINDS, EXTRACTOR_KINDS, HTTP_METHODS, taskListPath } from '@/lib/constants'
+import {
+  ASSERTION_KINDS,
+  EXTRACTOR_KINDS,
+  EXTRACTOR_LABEL,
+  HTTP_METHODS,
+  taskListPath,
+} from '@/lib/constants'
 import { moduleById } from '@/lib/navigation'
-import { draftFromTask, emptyDraft, payloadFromDraft, type TaskDraft } from '@/lib/taskDraft'
+import {
+  defaultRule,
+  draftFromTask,
+  emptyDraft,
+  extractorAllowed,
+  payloadFromDraft,
+  type TaskDraft,
+} from '@/lib/taskDraft'
 import { useUiStore } from '@/stores/ui'
 import type { PluginInfo, Run, Task, TaskType } from '@/types/api'
 
@@ -58,7 +71,7 @@ async function load() {
 }
 
 watch(
-  () => route.fullPath,
+  () => route.path,
   () => void load(),
   { immediate: true },
 )
@@ -144,8 +157,18 @@ async function runNow() {
       </button>
     </template>
     <p v-if="error" class="banner banner-danger" role="alert">{{ error }}</p>
-    <form class="stack" @submit.prevent="save">
-      <section class="card form-card">
+    <form class="stack workflow" @submit.prevent="save">
+      <nav class="workflow-nav" aria-label="任务配置步骤">
+        <a href="#schedule">调度</a>
+        <a href="#request">请求</a>
+        <a v-if="taskType !== 'load_test'" href="#target">检测对象</a>
+        <a v-if="taskType === 'page_change'" href="#extract">提取与转换</a>
+        <a v-if="taskType === 'page_change'" href="#compare">版本对比</a>
+        <a v-if="taskType === 'api_check'" href="#assertions">断言</a>
+        <a v-if="taskType === 'load_test'" href="#load">压测参数</a>
+        <a href="#notify">通知</a>
+      </nav>
+      <section id="schedule" class="card form-card workflow-step">
         <h2>基本信息</h2>
         <div class="grid-2">
           <label class="field">名称<input v-model="draft.name" maxlength="80" required /></label>
@@ -167,7 +190,7 @@ async function runNow() {
         >
       </section>
 
-      <section class="card form-card">
+      <section id="request" class="card form-card workflow-step">
         <h2>请求</h2>
         <div class="grid-2">
           <label class="field">
@@ -238,7 +261,7 @@ async function runNow() {
         </label>
       </section>
 
-      <section class="card form-card">
+      <section class="card form-card workflow-step">
         <h2>请求器与代理</h2>
         <div class="grid-2">
           <label class="field">
@@ -271,16 +294,61 @@ async function runNow() {
         /></label>
       </section>
 
-      <section v-if="taskType === 'page_change'" class="card form-card">
-        <h2>提取字段</h2>
+      <section v-if="taskType !== 'load_test'" id="target" class="card form-card workflow-step">
+        <h2>检测对象</h2>
+        <label class="field">
+          响应内容类型
+          <select v-model="draft.targetType">
+            <option value="auto">自动 / 混合提取</option>
+            <option value="html">HTML 网页</option>
+            <option value="json">JSON 接口</option>
+            <option value="text">纯文本</option>
+          </select>
+        </label>
+        <p v-if="draft.targetType === 'json'" class="hint">
+          检查响应是否为合法 JSON，可用 JSONPath 选择整个响应或指定字段。
+        </p>
+        <p v-else-if="draft.targetType === 'html'" class="hint">
+          可选 CSS、XPath、正则或 HTML 转 Markdown，选择正文区域能减少导航和页脚的干扰。
+        </p>
+      </section>
+
+      <section v-if="taskType === 'page_change'" id="extract" class="card form-card workflow-step">
+        <h2>提取与转换</h2>
         <p class="hint">只比较这些字段。空提取会记为「内容为空」，不会覆盖上一份快照。</p>
+        <p v-if="draft.rules.some((rule) => rule.kind === 'markdown')" class="hint">
+          Markdown 使用 CSS 元素选择器，图片保留为 ![描述](图片地址)，链接保留为 [文字](地址)。
+          相对地址会根据实际页面地址补全。
+        </p>
+        <button
+          class="btn-ghost"
+          type="button"
+          @click="draft.rules = [defaultRule(draft.targetType)]"
+        >
+          使用整个{{
+            draft.targetType === 'json' ? ' JSON' : draft.targetType === 'text' ? '正文' : '页面'
+          }}的常用规则
+        </button>
         <div v-for="(rule, index) in draft.rules" :key="index" class="rule-grid">
           <input v-model="rule.name" placeholder="字段名" aria-label="字段名" />
-          <select v-model="rule.kind" aria-label="提取方式">
-            <option v-for="kind in EXTRACTOR_KINDS" :key="kind" :value="kind">{{ kind }}</option>
+          <select v-model="rule.kind" aria-label="提取方式" @change="rule.attribute = ''">
+            <option
+              v-for="kind in EXTRACTOR_KINDS.filter(
+                (kind) => extractorAllowed(draft.targetType, kind) || kind === rule.kind,
+              )"
+              :key="kind"
+              :value="kind"
+            >
+              {{ EXTRACTOR_LABEL[kind] }}
+            </option>
           </select>
           <input v-model="rule.expression" placeholder="表达式" aria-label="表达式" />
-          <input v-model="rule.attribute" placeholder="属性，可空" aria-label="属性" />
+          <input
+            v-model="rule.attribute"
+            :disabled="rule.kind === 'markdown'"
+            :placeholder="rule.kind === 'markdown' ? '保留图片和链接' : '属性，可空'"
+            aria-label="属性"
+          />
           <button class="btn-ghost" type="button" @click="draft.rules.splice(index, 1)">
             删除
           </button>
@@ -288,13 +356,28 @@ async function runNow() {
         <button
           class="btn-ghost"
           type="button"
-          @click="draft.rules.push({ name: '', kind: 'css', expression: '', attribute: '' })"
+          @click="draft.rules.push({ ...defaultRule(draft.targetType), name: '' })"
         >
           添加字段
         </button>
       </section>
 
-      <section v-if="taskType === 'api_check'" class="card form-card">
+      <section v-if="taskType === 'page_change'" id="compare" class="card form-card workflow-step">
+        <h2>版本对比</h2>
+        <label class="check">
+          <input v-model="draft.compareEnabled" type="checkbox" />
+          <span>与上一份成功快照自动对比</span>
+        </label>
+        <p class="hint">
+          每次成功提取都保存历史版本，可在运行详情里选择任意两个版本对比。
+          新增为绿色，删除为红色，修改为黄色。
+        </p>
+        <RouterLink v-if="editingId" class="btn-ghost" :to="`/runs?task_id=${editingId}`"
+          >查看历史版本</RouterLink
+        >
+      </section>
+
+      <section v-if="taskType === 'api_check'" id="assertions" class="card form-card workflow-step">
         <h2>断言</h2>
         <p class="hint">
           期望状态码可以让 404 这类响应通过。没有断言时，空的成功响应会记为内容为空。
@@ -318,7 +401,7 @@ async function runNow() {
         </button>
       </section>
 
-      <section v-if="taskType === 'load_test'" class="card form-card">
+      <section v-if="taskType === 'load_test'" id="load" class="card form-card workflow-step">
         <h2>压测参数</h2>
         <div class="grid-2">
           <label class="field"
@@ -339,30 +422,36 @@ async function runNow() {
         </p>
       </section>
 
-      <section class="card form-card">
+      <section id="notify" class="card form-card workflow-step">
         <h2>通知</h2>
-        <label class="field">
-          外部通道
-          <select v-model="draft.notifyProvider">
-            <option v-for="item in notifiers" :key="item.name" :value="item.name">
-              {{ item.name }}{{ item.implemented ? '' : '（未实现）' }}
-            </option>
-          </select>
+        <label class="check">
+          <input v-model="draft.notifyEnabled" type="checkbox" />
+          <span>启用站内与外部通知</span>
         </label>
-        <p v-if="notifierInfo" class="hint">{{ notifierInfo.description }} 站内通知仍会写入。</p>
-        <label v-if="draft.notifyProvider === 'webhook'" class="field"
-          >Webhook URL<input v-model="draft.webhookUrl" type="url"
-        /></label>
-        <div class="toolbar">
-          <label class="check"
-            ><input v-model="draft.notifyOn.change" type="checkbox" /><span>变化</span></label
-          >
-          <label class="check"
-            ><input v-model="draft.notifyOn.failure" type="checkbox" /><span>失败</span></label
-          >
-          <label class="check"
-            ><input v-model="draft.notifyOn.block" type="checkbox" /><span>拦截</span></label
-          >
+        <div v-if="draft.notifyEnabled" class="stack">
+          <label class="field">
+            外部通道
+            <select v-model="draft.notifyProvider">
+              <option v-for="item in notifiers" :key="item.name" :value="item.name">
+                {{ item.name }}{{ item.implemented ? '' : '（未实现）' }}
+              </option>
+            </select>
+          </label>
+          <p v-if="notifierInfo" class="hint">{{ notifierInfo.description }} 站内通知仍会写入。</p>
+          <label v-if="draft.notifyProvider === 'webhook'" class="field"
+            >Webhook URL<input v-model="draft.webhookUrl" type="url"
+          /></label>
+          <div class="toolbar">
+            <label class="check"
+              ><input v-model="draft.notifyOn.change" type="checkbox" /><span>变化</span></label
+            >
+            <label class="check"
+              ><input v-model="draft.notifyOn.failure" type="checkbox" /><span>失败</span></label
+            >
+            <label class="check"
+              ><input v-model="draft.notifyOn.block" type="checkbox" /><span>拦截</span></label
+            >
+          </div>
         </div>
       </section>
     </form>

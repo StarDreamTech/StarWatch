@@ -32,7 +32,7 @@ class NotifyService:
             run: 已保存的运行记录。
             evaluation: 任务类型插件的判定。
         """
-        if not evaluation.notify or evaluation.notify_category is None:
+        if not task.notify.enabled or not evaluation.notify or evaluation.notify_category is None:
             return
         if evaluation.notify_category not in task.notify.on:
             return

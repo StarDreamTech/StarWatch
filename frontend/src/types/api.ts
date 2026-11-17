@@ -5,7 +5,8 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 
 export type NotifyCategory = 'change' | 'failure' | 'block'
 export type DeliveryStatus = 'sent' | 'skipped' | 'failed' | 'not_implemented'
 export type DiffStatus = 'added' | 'removed' | 'modified' | 'unchanged'
-export type ExtractorKind = 'css' | 'xpath' | 'jsonpath' | 'regex'
+export type ExtractorKind = 'css' | 'xpath' | 'jsonpath' | 'regex' | 'markdown'
+export type TargetType = 'auto' | 'html' | 'json' | 'text'
 export type AssertionKind = 'status' | 'latency_ms' | 'body_contains' | 'jsonpath' | 'header'
 
 export interface ErrorBody {
@@ -71,6 +72,7 @@ export interface LoadSpec {
 }
 
 export interface NotifySpec {
+  enabled: boolean
   provider: string
   params: Record<string, unknown>
   on: NotifyCategory[]
@@ -83,6 +85,8 @@ export interface Task {
   enabled: boolean
   schedule: Schedule
   task_type: TaskType
+  target_type: TargetType
+  compare_enabled: boolean
   request: RequestSpec
   requester: NamedConfig
   proxy: ProxyConfig
@@ -104,6 +108,8 @@ export interface TaskCreate {
   enabled: boolean
   schedule: string
   task_type: TaskType
+  target_type: TargetType
+  compare_enabled: boolean
   request: RequestSpec
   requester: NamedConfig
   proxy: ProxyConfig
@@ -118,6 +124,15 @@ export interface FieldDiff {
   status: DiffStatus
   before: string[]
   after: string[]
+  lines: DiffLine[]
+}
+
+export interface DiffLine {
+  status: DiffStatus
+  before: string | null
+  after: string | null
+  before_number: number | null
+  after_number: number | null
 }
 
 export interface DiffResult {

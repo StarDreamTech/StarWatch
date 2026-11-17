@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ScrollText } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import DataTable, { type TableColumn, type TableRow } from '@/components/common/DataTable.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import LoadingSkeleton from '@/components/common/LoadingSkeleton.vue'
@@ -20,6 +20,8 @@ const outcome = ref<Outcome | ''>('')
 const loading = ref(true)
 const error = ref('')
 const current = moduleById('runs')
+const route = useRoute()
+const taskId = computed(() => (typeof route.query.task_id === 'string' ? route.query.task_id : ''))
 let timer = 0
 
 const columns: TableColumn[] = [
@@ -52,6 +54,7 @@ async function load() {
   try {
     const result = await api<Page<RunSummary>>(
       withQuery('/runs', {
+        task_id: taskId.value || undefined,
         outcome: outcome.value || undefined,
         limit: PAGE_SIZE,
         offset: (page.value - 1) * PAGE_SIZE,
@@ -71,7 +74,7 @@ function goToPage(next: number) {
   void load()
 }
 
-watch(outcome, () => {
+watch([outcome, taskId], () => {
   page.value = 1
   void load()
 })

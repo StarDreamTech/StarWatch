@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from typing import cast
 
 from starwatch_core.bootstrap import extractors, proxies, register_builtins, requesters
 from starwatch_core.classify import ClassifiedExchange, RawExchange, classify_exchange
 from starwatch_core.errors import ExtractError, PluginNotImplementedError, ProxyConfigError
+from starwatch_core.extractors import html_with_absolute_links
 from starwatch_core.protocols import Extractor, ProxyProvider, Requester
 from starwatch_core.schemas import FetchEnvelope, FetchRequest, LoadSummary, Outcome
 
@@ -47,7 +49,7 @@ class FetchService:
             raw = await requester.execute(payload.request, proxy)
         except PluginNotImplementedError as exc:
             return _failed(payload, "requester_unavailable", str(exc))
-        extracted, extract_error = await _extract(payload, raw.body)
+        extracted, extract_error = await _extract(payload, raw.body, raw.final_url)
         envelope = envelope_from_exchange(raw, extracted, requester.name, proxy.label, load=None)
         if extract_error and envelope.outcome is Outcome.SUCCESS:
             return envelope.model_copy(
@@ -86,15 +88,25 @@ def envelope_from_exchange(
     )
 
 
-async def _extract(payload: FetchRequest, body: str) -> tuple[dict[str, list[str]], str | None]:
+async def _extract(
+    payload: FetchRequest, body: str, final_url: str | None
+) -> tuple[dict[str, list[str]], str | None]:
     """执行全部提取规则。编译期没有拦住的运行时错误返回说明。"""
     extracted: dict[str, list[str]] = {}
+    if payload.target_type == "json" and body.strip():
+        try:
+            json.loads(body)
+        except ValueError:
+            return extracted, "检测对象选择了 JSON，但响应不是合法 JSON"
     for rule in payload.extract_rules:
         extractor = cast(Extractor, extractors.get(rule.kind))
         try:
-            extracted[rule.name] = await asyncio.to_thread(extractor.extract, body, rule)
-        except ExtractError as exc:
-            return extracted, exc.message
+            source = body
+            if rule.kind == "markdown" and body.strip():
+                source = html_with_absolute_links(body, final_url or str(payload.request.url))
+            extracted[rule.name] = await asyncio.to_thread(extractor.extract, source, rule)
+        except (ExtractError, ValueError) as exc:
+            return extracted, str(exc)
     return extracted, None
 
 

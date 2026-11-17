@@ -49,16 +49,16 @@ export const MODULES: NavModule[] = [
   },
   {
     id: 'pages',
-    name: '网页监控',
+    name: '内容监控',
     en: 'Pages',
     accent: 'blue',
     to: '/pages',
     icon: Globe,
     children: [
-      { name: '监控列表', description: '按字段比较页面变化', to: '/pages', icon: List },
+      { name: '监控列表', description: '网页、JSON 和文本版本对比', to: '/pages', icon: List },
       {
         name: '新建监控',
-        description: 'CSS、XPath、JSONPath 或正则',
+        description: 'Markdown、JSONPath 或字段提取',
         to: '/pages/new',
         icon: Plus,
       },

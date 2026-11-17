@@ -37,7 +37,7 @@ class PageChangeHandler:
     """比较提取字段。拦截、超时和空结果不会记成无变化。"""
 
     name = "page_change"
-    description = "按 CSS、XPath、JSONPath 或正则提取字段，并与上一份快照比较。"
+    description = "按 CSS、XPath、JSONPath、正则或 Markdown 提取，并比较历史快照。"
     implemented = True
 
     def evaluate(
@@ -65,6 +65,12 @@ class PageChangeHandler:
                 envelope.error_type or "empty_extract",
                 notify=True,
                 category="block",
+            )
+        if not task.compare_enabled:
+            return TaskEvaluation(
+                outcome=Outcome.SUCCESS,
+                summary="已保存本次内容，版本对比未启用",
+                snapshot=envelope.extracted,
             )
         if previous is None:
             return TaskEvaluation(
