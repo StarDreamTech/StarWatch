@@ -1,5 +1,7 @@
 # 星哨 StarWatch
 
+[English](./README.en.md)
+
 **[项目介绍 / Project site](https://stardreamtech.github.io/projects/starwatch/)**
 
 星哨是一个可以自己托管的定时监控平台。你用标准的五段 cron，或者 `every 30s`、`every 1 minute`、`每 2 分钟` 这样的间隔，定义什么时候去看一个页面或接口。调度器只负责时间和存储；真正发请求的是无状态的抓取器。
